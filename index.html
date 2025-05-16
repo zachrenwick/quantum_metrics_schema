@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Database Schema Viewer</title>
+    <title>Quantum Metrics BigQuery Schema Viewer</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://d3js.org/d3.v7.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -138,7 +138,7 @@
         // 'children' is an array of child nodes. If a node has children, it's expandable.
         // '_children' is used to store collapsed children.
         const schemaData = {
-            name: "MyUniversityDB",
+            name: "id",
             type: "database",
             details: "Main university database",
             children: [
@@ -152,78 +152,30 @@
                             type: "table",
                             details: "Stores student information",
                             children: [
-                                { name: "StudentID", type: "column", details: "INT, Primary Key" },
-                                { name: "FirstName", type: "column", details: "VARCHAR(50)" },
-                                { name: "LastName", type: "column", details: "VARCHAR(50)" },
-                                { name: "DateOfBirth", type: "column", details: "DATE" },
-                                { name: "EnrollmentDate", type: "column", details: "DATE" }
-                            ]
-                        },
-                        {
-                            name: "Courses",
-                            type: "table",
-                            details: "Stores course information",
-                            children: [
-                                { name: "CourseID", type: "column", details: "INT, Primary Key" },
-                                { name: "CourseName", type: "column", details: "VARCHAR(100)" },
-                                { name: "Credits", type: "column", details: "INT" },
-                                {
-                                    name: "DepartmentID", type: "column", details: "INT, Foreign Key (Departments.DepartmentID)",
-                                    children: [ // Example of deeper nesting if needed for relationships
-                                        { name: "FK_Courses_Departments", type: "constraint", details: "Links to Departments table" }
-                                    ]
-                                }
-                            ]
-                        },
-                        {
-                            name: "Enrollments",
-                            type: "table",
-                            details: "Tracks student enrollments in courses",
-                            children: [
-                                { name: "EnrollmentID", type: "column", details: "INT, Primary Key" },
-                                { name: "StudentID", type: "column", details: "INT, Foreign Key (Students.StudentID)" },
-                                { name: "CourseID", type: "column", details: "INT, Foreign Key (Courses.CourseID)" },
-                                { name: "Grade", type: "column", details: "CHAR(2)" }
-                            ]
-                        },
-                        {
-                            name: "Departments",
-                            type: "table",
-                            details: "Stores department information",
-                            children: [
-                                { name: "DepartmentID", type: "column", details: "INT, Primary Key" },
-                                { name: "DepartmentName", type: "column", details: "VARCHAR(100)" }
+                                { name: "StudentID", type: "column", details: "INT, Primary Key" }
                             ]
                         }
                     ]
-                },
+                ],
+            name: "cookie",
+            type: "database",
+            details: "cookie",
+            children: [
                 {
-                    name: "reporting",
+                    name: "dbo",
                     type: "schema",
-                    details: "Schema for reporting views and procedures",
+                    details: "Default schema",
                     children: [
                         {
-                            name: "StudentGradesView",
-                            type: "view",
-                            details: "View for student grades",
+                            name: "Students",
+                            type: "table",
+                            details: "Stores student information",
                             children: [
-                                { name: "StudentID", type: "column", details: "INT" },
-                                { name: "FullName", type: "column", details: "VARCHAR(101)" },
-                                { name: "CourseName", type: "column", details: "VARCHAR(100)" },
-                                { name: "Grade", type: "column", details: "CHAR(2)" }
-                            ]
-                        },
-                        {
-                            name: "GetStudentDetails",
-                            type: "stored_procedure",
-                            details: "Procedure to get student details by ID",
-                            children: [
-                                { name: "@StudentID", type: "parameter", details: "INT, Input" },
+                                { name: "StudentID", type: "column", details: "INT, Primary Key" }
                             ]
                         }
                     ]
-                }
-            ]
+                ]
         };
 
         // --- D3 Setup ---
