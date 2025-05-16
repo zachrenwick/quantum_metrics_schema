@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Database Schema Viewer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            margin: 0;
+            background-color: #f3f4f6; /* Tailwind gray-100 */
+            display: flex;
+            justify-content: center;
+            align-items: flex-start; /* Align to top for scrolling */
+            min-height: 100vh;
+            padding: 2rem; /* Tailwind p-8 */
+            box-sizing: border-box;
+        }
+
+        .tree-container {
+            background-color: white;
+            padding: 2rem; /* Tailwind p-8 */
+            border-radius: 0.75rem; /* Tailwind rounded-xl */
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05); /* Tailwind shadow-lg */
+            width: 100%;
+            max-width: 64rem; /* Tailwind max-w-3xl */
+            overflow-x: auto; /* Allow horizontal scrolling if tree is too wide */
+        }
+
+        .node circle {
+            fill: #93c5fd; /* Tailwind blue-300 */
+            stroke: #3b82f6; /* Tailwind blue-600 */
+            stroke-width: 2px;
+            cursor: pointer;
+        }
+
+        .node text {
+            font-size: 0.875rem; /* Tailwind text-sm */
+            font-weight: 500; /* Tailwind font-medium */
+            fill: #374151; /* Tailwind gray-700 */
+            cursor: pointer;
+        }
+
+        .node .node-label-bg { /* Background for text for better readability */
+            stroke: white;
+            stroke-width: 0.4em;
+            opacity: 0.7;
+        }
+
+        .link {
+            fill: none;
+            stroke: #9ca3af; /* Tailwind gray-400 */
+            stroke-width: 1.5px;
+        }
+
+        .controls {
+            margin-bottom: 1.5rem; /* Tailwind mb-6 */
+            display: flex;
+            gap: 0.5rem; /* Tailwind space-x-2 */
+            align-items: center;
+        }
+
+        .controls button, .controls select, .controls input {
+            padding: 0.5rem 1rem; /* Tailwind py-2 px-4 */
+            border-radius: 0.375rem; /* Tailwind rounded-md */
+            border: 1px solid #d1d5db; /* Tailwind border-gray-300 */
+            background-color: white;
+            font-weight: 500; /* Tailwind font-medium */
+            color: #374151; /* Tailwind gray-700 */
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        .controls button:hover, .controls select:hover, .controls input:hover {
+            background-color: #f9fafb; /* Tailwind gray-50 */
+        }
+
+        .controls label {
+            font-weight: 500; /* Tailwind font-medium */
+            color: #4b5563; /* Tailwind gray-600 */
+        }
+
+        .node-info {
+            margin-top: 1rem; /* Tailwind mt-4 */
+            padding: 0.75rem; /* Tailwind p-3 */
+            background-color: #eef2ff; /* Tailwind indigo-50 */
+            border: 1px solid #c7d2fe; /* Tailwind indigo-200 */
+            border-radius: 0.375rem; /* Tailwind rounded-md */
+            font-size: 0.875rem; /* Tailwind text-sm */
+            color: #4338ca; /* Tailwind indigo-700 */
+        }
+
+        .node-info strong {
+            font-weight: 600; /* Tailwind font-semibold */
+        }
+
+        /* Tooltip styles */
+        .tooltip {
+            position: absolute;
+            text-align: center;
+            padding: 0.5rem;
+            font-size: 0.75rem; /* text-xs */
+            background: #1f2937; /* gray-800 */
+            color: white;
+            border: 0px;
+            border-radius: 0.375rem; /* rounded-md */
+            pointer-events: none; /* The tooltip should not interfere with mouse events */
+            opacity: 0;
+            transition: opacity 0.2s;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        }
+    </style>
+</head>
+<body>
+    <div class="tree-container">
+        <h1 class="text-2xl font-bold text-gray-800 mb-6 text-center">Database Schema Visualization</h1>
+
+        <div class="controls">
+            <button id="zoomInBtn">Zoom In</button>
+            <button id="zoomOutBtn">Zoom Out</button>
+            <button id="resetZoomBtn">Reset View</button>
+            <button id="expandAllBtn">Expand All</button>
+            <button id="collapseAllBtn">Collapse All</button>
+        </div>
+
+        <svg width="1000" height="800"></svg>
+        <div class="tooltip"></div> </div>
+
+    <script>
+        // Sample Database Schema Data
+        // This represents a hierarchical structure of a database.
+        // 'name' is the displayed name.
+        // 'type' can be 'database', 'schema', 'table', 'column'.
+        // 'details' can hold extra information like data type for columns.
+        // 'children' is an array of child nodes. If a node has children, it's expandable.
+        // '_children' is used to store collapsed children.
+        const schemaData = {
+            name: "MyUniversityDB",
+            type: "database",
+            details: "Main university database",
+            children: [
+                {
+                    name: "dbo",
+                    type: "schema",
+                    details: "Default schema",
+                    children: [
+                        {
+                            name: "Students",
+                            type: "table",
+                            details: "Stores student information",
+                            children: [
+                                { name: "StudentID", type: "column", details: "INT, Primary Key" },
+                                { name: "FirstName", type: "column", details: "VARCHAR(50)" },
+                                { name: "LastName", type: "column", details: "VARCHAR(50)" },
+                                { name: "DateOfBirth", type: "column", details: "DATE" },
+                                { name: "EnrollmentDate", type: "column", details: "DATE" }
+                            ]
+                        },
+                        {
+                            name: "Courses",
+                            type: "table",
+                            details: "Stores course information",
+                            children: [
+                                { name: "CourseID", type: "column", details: "INT, Primary Key" },
+                                { name: "CourseName", type: "column", details: "VARCHAR(100)" },
+                                { name: "Credits", type: "column", details: "INT" },
+                                {
+                                    name: "DepartmentID", type: "column", details: "INT, Foreign Key (Departments.DepartmentID)",
+                                    children: [ // Example of deeper nesting if needed for relationships
+                                        { name: "FK_Courses_Departments", type: "constraint", details: "Links to Departments table" }
+                                    ]
+                                }
+                            ]
+                        },
+                        {
+                            name: "Enrollments",
+                            type: "table",
+                            details: "Tracks student enrollments in courses",
+                            children: [
+                                { name: "EnrollmentID", type: "column", details: "INT, Primary Key" },
+                                { name: "StudentID", type: "column", details: "INT, Foreign Key (Students.StudentID)" },
+                                { name: "CourseID", type: "column", details: "INT, Foreign Key (Courses.CourseID)" },
+                                { name: "Grade", type: "column", details: "CHAR(2)" }
+                            ]
+                        },
+                        {
+                            name: "Departments",
+                            type: "table",
+                            details: "Stores department information",
+                            children: [
+                                { name: "DepartmentID", type: "column", details: "INT, Primary Key" },
+                                { name: "DepartmentName", type: "column", details: "VARCHAR(100)" }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    name: "reporting",
+                    type: "schema",
+                    details: "Schema for reporting views and procedures",
+                    children: [
+                        {
+                            name: "StudentGradesView",
+                            type: "view",
+                            details: "View for student grades",
+                            children: [
+                                { name: "StudentID", type: "column", details: "INT" },
+                                { name: "FullName", type: "column", details: "VARCHAR(101)" },
+                                { name: "CourseName", type: "column", details: "VARCHAR(100)" },
+                                { name: "Grade", type: "column", details: "CHAR(2)" }
+                            ]
+                        },
+                        {
+                            name: "GetStudentDetails",
+                            type: "stored_procedure",
+                            details: "Procedure to get student details by ID",
+                            children: [
+                                { name: "@StudentID", type: "parameter", details: "INT, Input" },
+                            ]
+                        }
+                    ]
+                }
+            ]
+        };
+
+        // --- D3 Setup ---
+        const margin = { top: 20, right: 120, bottom: 20, left: 120 }; // Increased left margin for labels
+        const svgElement = document.querySelector("svg");
+        const container = document.querySelector(".tree-container");
+
+        // Function to get dimensions and update SVG
+        function getAndUpdateSvgDimensions() {
+            const containerWidth = container.clientWidth;
+            // Attempt to make height dynamic or a large fixed value
+            // For a very tall tree, you might need a fixed large height and rely on container scrolling
+            const svgHeight = Math.max(800, container.clientHeight - 150); // Adjust 150 based on header/controls height
+
+            svgElement.setAttribute("width", containerWidth);
+            svgElement.setAttribute("height", svgHeight);
+
+            return {
+                width: containerWidth - margin.left - margin.right,
+                height: svgHeight - margin.top - margin.bottom,
+                svgWidth: containerWidth,
+                svgHeight: svgHeight
+            };
+        }
+
+
+        let { width, height, svgWidth, svgHeight } = getAndUpdateSvgDimensions();
+
+        const svg = d3.select(svgElement);
+        const g = svg.append("g").attr("transform", `translate(${margin.left},${margin.top})`);
+
+        // Tooltip
+        const tooltip = d3.select(".tooltip");
+
+        // Tree layout
+        const treeLayout = d3.tree().size([height, width - 200]); // Adjust width for labels
+
+        let root;
+        let i = 0; // Counter for node IDs
+        const duration = 750; // Animation duration
+
+        // Zoom behavior
+        const zoom = d3.zoom()
+            .scaleExtent([0.1, 3]) // Min and max zoom levels
+            .on("zoom", (event) => {
+                g.attr("transform", event.transform);
+            });
+
+        svg.call(zoom);
+
+        // --- Helper Functions ---
+
+        // Function to collapse all children of a node
+        function collapse(d) {
+            if (d.children) {
+                d._children = d.children;
+                d._children.forEach(collapse); // Recursively collapse children
+                d.children = null;
+            }
+        }
+
+        // Function to expand all children of a node
+        function expand(d) {
+            if (d._children) {
+                d.children = d._children;
+                d.children.forEach(expand); // Recursively expand children
+                d._children = null;
+            }
+        }
+
+        // Function to toggle children on click
+        function toggleChildren(event, d) {
+            if (d.children) { // If children are visible, collapse them
+                d._children = d.children;
+                d.children = null;
+            } else if (d._children) { // If children are hidden, expand them
+                d.children = d._children;
+                d._children = null;
+            }
+            update(d); // Re-render the tree from the clicked node
+            // Center node, but only if it's not the root to avoid jarring initial zoom
+            if (d.parent) {
+                 centerNode(d);
+            }
+        }
+
+        // Function to center a node in the view
+        function centerNode(source) {
+            const t = d3.zoomTransform(svg.node());
+            let x = -source.y0;
+            let y = -source.x0;
+            x = x * t.k + svgWidth / 2;
+            y = y * t.k + svgHeight / 2;
+
+            svg.transition().duration(duration)
+               .call(zoom.transform, d3.zoomIdentity.translate(x,y).scale(t.k));
+        }
+
+
+        // --- Update Function (Core D3 rendering logic) ---
+        function update(source) {
+            const treeData = treeLayout(root);
+            const nodes = treeData.descendants();
+            const links = treeData.links();
+
+            // Normalize for fixed-depth.
+            // Adjust node horizontal spacing based on depth
+            nodes.forEach(d => { d.y = d.depth * 220 }); // Increase spacing for readability
+
+            // --- Nodes ---
+            const node = g.selectAll("g.node")
+                .data(nodes, d => d.id || (d.id = ++i)); // Assign unique ID if not present
+
+            // Enter new nodes at the parent's previous position.
+            const nodeEnter = node.enter().append("g")
+                .attr("class", "node")
+                .attr("transform", d => `translate(${source.y0 || 0},${source.x0 || 0})`) // Initial position for entering nodes
+                .on("click", toggleChildren)
+                .on("mouseover", function(event, d) {
+                    tooltip.transition().duration(200).style("opacity", .9);
+                    let tooltipContent = `<strong>${d.data.name}</strong> (${d.data.type})`;
+                    if (d.data.details) {
+                        tooltipContent += `<br>${d.data.details}`;
+                    }
+                    tooltip.html(tooltipContent)
+                        .style("left", (event.pageX + 15) + "px")
+                        .style("top", (event.pageY - 28) + "px");
+                })
+                .on("mouseout", function(d) {
+                    tooltip.transition().duration(500).style("opacity", 0);
+                });
+
+            nodeEnter.append("circle")
+                .attr("r", 1e-6) // Start with a tiny circle for animation
+                .style("fill", d => d._children ? "#3b82f6" : (d.children ? "#93c5fd" : "#e5e7eb")); // Blue if expandable, lighter blue if expanded, gray if leaf
+
+            // Add a white background to text for better readability over lines
+            nodeEnter.append("text")
+                .attr("class", "node-label-bg")
+                .attr("dy", ".35em")
+                .attr("x", d => d.children || d._children ? -16 : 16)
+                .attr("text-anchor", d => d.children || d._children ? "end" : "start")
+                .text(d => d.data.name);
+
+            nodeEnter.append("text")
+                .attr("dy", ".35em")
+                .attr("x", d => d.children || d._children ? -16 : 16) // Position text left or right of node
+                .attr("text-anchor", d => d.children || d._children ? "end" : "start")
+                .text(d => d.data.name)
+                 .append("tspan") // For type information
+                    .attr("dx", "0.5em")
+                    .attr("dy", "1.2em") // Position below the name
+                    .style("font-size", "0.7rem") // Smaller font for type
+                    .style("fill", "#6b7280") // Gray color for type
+                    .text(d => `(${d.data.type})`);
+
+
+            // Transition nodes to their new position.
+            const nodeUpdate = nodeEnter.merge(node);
+
+            nodeUpdate.transition()
+                .duration(duration)
+                .attr("transform", d => `translate(${d.y},${d.x})`);
+
+            nodeUpdate.select("circle")
+                .attr("r", 7) // Standard circle radius
+                .style("fill", d => d._children ? "#3b82f6" : (d.children ? "#93c5fd" : "#e5e7eb")) // Blue if expandable, gray if leaf
+                .attr("stroke", d => d.children || d._children ? "#2563eb" : "#9ca3af")
+                .style("stroke-width", "2px");
+
+
+            // Transition exiting nodes to the parent's new position.
+            const nodeExit = node.exit().transition()
+                .duration(duration)
+                .attr("transform", d => `translate(${source.y},${source.x})`)
+                .remove();
+
+            nodeExit.select("circle").attr("r", 1e-6);
+            nodeExit.select("text").style("fill-opacity", 1e-6);
+            nodeExit.select(".node-label-bg").style("fill-opacity", 1e-6);
+
+
+            // --- Links ---
+            const link = g.selectAll("path.link")
+                .data(links, d => d.target.id);
+
+            // Enter new links at the parent's previous position.
+            const linkEnter = link.enter().insert("path", "g") // Insert links behind nodes
+                .attr("class", "link")
+                .attr("d", d => {
+                    const o = { x: source.x0 || 0, y: source.y0 || 0 };
+                    return d3.linkHorizontal()({ source: o, target: o });
+                });
+
+            // Transition links to their new position.
+            linkEnter.merge(link).transition()
+                .duration(duration)
+                .attr("d", d3.linkHorizontal().x(d => d.y).y(d => d.x));
+
+            // Transition exiting nodes to the parent's new position.
+            link.exit().transition()
+                .duration(duration)
+                .attr("d", d => {
+                    const o = { x: source.x, y: source.y };
+                    return d3.linkHorizontal()({ source: o, target: o });
+                })
+                .remove();
+
+            // Stash the old positions for transition.
+            nodes.forEach(d => {
+                d.x0 = d.x;
+                d.y0 = d.y;
+            });
+        }
+
+        // --- Initial Render ---
+        root = d3.hierarchy(schemaData, d => d.children); // Create hierarchy from data
+        root.x0 = height / 2; // Initial X position (vertical center)
+        root.y0 = 0;          // Initial Y position (left edge)
+
+        // Collapse all nodes initially except the root's direct children
+        if (root.children) {
+            root.children.forEach(child => {
+                if(child.children){ // If the child itself has children, collapse them
+                    collapse(child);
+                }
+            });
+        }
+        update(root); // Render the initial tree
+
+        // --- Control Button Event Listeners ---
+        d3.select("#zoomInBtn").on("click", () => {
+            svg.transition().duration(250).call(zoom.scaleBy, 1.2);
+        });
+
+        d3.select("#zoomOutBtn").on("click", () => {
+            svg.transition().duration(250).call(zoom.scaleBy, 0.8);
+        });
+
+        d3.select("#resetZoomBtn").on("click", () => {
+            // Recalculate dimensions in case of resize
+            const currentDims = getAndUpdateSvgDimensions();
+            width = currentDims.width;
+            height = currentDims.height;
+            svgWidth = currentDims.svgWidth;
+            svgHeight = currentDims.svgHeight;
+
+            // Update tree layout size
+            treeLayout.size([height, width - 200]);
+
+            // Reset zoom and center the root node
+            svg.transition().duration(750).call(zoom.transform, d3.zoomIdentity);
+             // Optional: recenter on root after reset
+            root.x0 = height / 2;
+            root.y0 = 0;
+            // update(root); // Re-render to apply new layout size
+            // centerNode(root); // This might be too aggressive, could just reset transform
+        });
+
+
+        d3.select("#expandAllBtn").on("click", () => {
+            expand(root); // Expand all nodes starting from the root
+            update(root);
+        });
+
+        d3.select("#collapseAllBtn").on("click", () => {
+            if (root.children) { // Keep root's direct children, collapse deeper
+                 root.children.forEach(collapse);
+            }
+            update(root);
+        });
+
+        // Responsive resizing
+        window.addEventListener('resize', () => {
+            const currentDims = getAndUpdateSvgDimensions();
+            width = currentDims.width;
+            height = currentDims.height;
+            svgWidth = currentDims.svgWidth;
+            svgHeight = currentDims.svgHeight;
+
+            treeLayout.size([height, width - 200]); // Update layout size
+            update(root); // Re-render the tree with new dimensions
+            // Optionally, re-center or adjust view after resize
+            // svg.call(zoom.transform, d3.zoomIdentity); // Reset zoom on resize
+        });
+
+    </script>
+</body>
+</html>
